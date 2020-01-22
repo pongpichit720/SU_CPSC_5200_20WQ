@@ -68,10 +68,11 @@ namespace restapi.Controllers
             return timecard;
         }
 
-        [HttpDelete("{id:guid}")]
+        [HttpDelete("{id:guid}/deletion")]
         [ProducesResponseType(200)]
         [ProducesResponseType(404)]
-        public IActionResult Delete(Guid id)
+        [ProducesResponseType(typeof(InvalidStateError), 409)]
+        public IActionResult Delete(Guid id, [FromBody] Deletion deletion)
         {
             logger.LogInformation($"Looking for timesheet {id}");
 
@@ -87,9 +88,15 @@ namespace restapi.Controllers
                 return StatusCode(409, new InvalidStateError() { });
             }
 
+            var transition = new Transition(deletion, TimecardStatus.Deleted);
+
+            logger.LogInformation($"Adding deletion transition {transition}");
+
+            timecard.Transitions.Add(transition);
+
             repository.Delete(id);
 
-            return Ok();
+            return Ok(transition);
         }
 
         [HttpGet("{id:guid}/lines")]
@@ -381,6 +388,7 @@ namespace restapi.Controllers
         [ProducesResponseType(404)]
         [ProducesResponseType(typeof(InvalidStateError), 409)]
         [ProducesResponseType(typeof(EmptyTimecardError), 409)]
+        [ProducesResponseType(typeof(InvalidApprovalError), 409)]
         public IActionResult Approve(Guid id, [FromBody] Approval approval)
         {
             logger.LogInformation($"Looking for timesheet {id}");
@@ -392,6 +400,11 @@ namespace restapi.Controllers
                 if (timecard.Status != TimecardStatus.Submitted)
                 {
                     return StatusCode(409, new InvalidStateError() { });
+                }
+
+                if (approval.Person == timecard.Employee)
+                {
+                    return StatusCode(409, new InvalidApprovalError() { });
                 }
 
                 var transition = new Transition(approval, TimecardStatus.Approved);
