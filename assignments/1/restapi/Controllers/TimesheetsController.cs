@@ -153,6 +153,42 @@ namespace restapi.Controllers
             }
         }
 
+        [HttpPost("{timecardId:guid}/lines/{lineId:guid}")]
+        [Produces(ContentTypes.TimesheetLine)]
+        [ProducesResponseType(typeof(TimecardLine), 200)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(typeof(InvalidStateError), 409)]
+        public IActionResult ReplaceLine(Guid timecardId, Guid lineId, [FromBody] DocumentLine documentLine)
+        {
+            logger.LogInformation($"Looking for timesheet {timecardId}");
+
+            Timecard timecard = repository.Find(timecardId);
+
+            if (timecard == null)
+            {
+                return NotFound();
+            }
+
+            if (timecard.Status != TimecardStatus.Draft)
+            {
+                return StatusCode(409, new InvalidStateError() { });
+            }
+
+            logger.LogInformation($"Looking for timecard line {lineId}");
+
+            if (!timecard.HasLine(lineId))
+            {
+                return NotFound(); 
+            }
+
+            // var annotatedLine = timecard.AddLine(documentLine);
+
+            // repository.Update(timecard);
+
+            // return Ok(annotatedLine);
+            return Ok();
+        }
+
         [HttpGet("{id:guid}/transitions")]
         [Produces(ContentTypes.Transitions)]
         [ProducesResponseType(typeof(IEnumerable<Transition>), 200)]
